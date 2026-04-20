@@ -1,0 +1,18 @@
+.claude/
+# Backend
+backend/build/
+backend/.gradle/
+backend/bin/
+*.class
+*.jar
+!gradle-wrapper.jar
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env.local
+
+# OS
+.DS_Store
+*.log
