@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "item_option_group")
+@Table(name = "food_item_option_group")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ItemOptionGroup {

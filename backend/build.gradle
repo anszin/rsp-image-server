@@ -21,13 +21,40 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.flywaydb:flyway-database-postgresql'
 	compileOnly 'org.projectlombok:lombok'
+	runtimeOnly 'org.postgresql:postgresql'
 	runtimeOnly 'com.h2database:h2'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+bootRun {
+	def envFile = file('.env')
+	if (envFile.exists()) {
+		def props = [:]
+		envFile.readLines().each { line ->
+			if (line && !line.startsWith('#') && line.contains('=')) {
+				def parts = line.split('=', 2)
+				props[parts[0].trim()] = parts[1].trim()
+			}
+		}
+		def dbHost = props['DB_HOST'] ?: 'localhost'
+		def dbPort = props['DB_PORT'] ?: '5432'
+		def dbName = props['DB_NAME'] ?: 'postgres'
+		def dbUser = props['DB_USERNAME'] ?: ''
+		def dbPass = props['DB_PASSWORD'] ?: ''
+		println "[.env] DB_HOST=${dbHost}, DB_USER=${dbUser}, DB_PASS=${dbPass ? '***(' + dbPass.length() + 'chars)' : 'EMPTY'}"
+		systemProperty 'spring.datasource.url', "jdbc:postgresql://${dbHost}:${dbPort}/${dbName}?prepareThreshold=0"
+		systemProperty 'spring.datasource.username', dbUser
+		systemProperty 'spring.datasource.password', dbPass
+	} else {
+		println "[.env] NOT FOUND at ${envFile.absolutePath}"
+	}
 }
 
 tasks.named('test') {

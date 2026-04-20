@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "store")
+@Table(name = "food_store")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Store {

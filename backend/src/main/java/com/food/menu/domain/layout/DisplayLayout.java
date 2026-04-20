@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "display_layout")
+@Table(name = "food_display_layout")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DisplayLayout {

@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "item_image")
+@Table(name = "food_item_image")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ItemImage {

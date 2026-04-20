@@ -6,7 +6,7 @@ import lombok.*;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "item_option_value")
+@Table(name = "food_item_option_value")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ItemOptionValue {

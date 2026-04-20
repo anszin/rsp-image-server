@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "category")
+@Table(name = "food_category")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Category {

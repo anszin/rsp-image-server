@@ -6,7 +6,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "item_slot",
+@Table(name = "food_item_slot",
        uniqueConstraints = @UniqueConstraint(columnNames = {"menu_id", "page", "row_idx", "col_idx"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
