@@ -149,7 +149,7 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'Pretendard', background: '#f5f7fa' }}>
+    <div style={{ display: 'flex', height: '100%', fontFamily: 'Pretendard', background: '#f5f7fa' }}>
 
       {/* ── 좌측: 편집 패널 ── */}
       <div style={{ width: 440, background: '#fff', borderRight: '1px solid #e0e0e0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -327,9 +327,6 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
           <ImageUploader />
           <OptionGroupEditor />
 
-          {/* ── 레이아웃 설정 ── */}
-          {selectedStore && <LayoutSettingPanel storeId={selectedStore.id} />}
-
           {/* ── 슬롯 편집 진입 ── */}
           {selectedMenu && onOpenSlotEditor && (
             <button
@@ -342,31 +339,42 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
         </div>
       </div>
 
-      {/* ── 우측: 프리뷰 패널 ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24, overflow: 'auto' }}>
-        <div style={{ display: 'flex', gap: 0, marginBottom: 20, border: '1px solid #ddd', borderRadius: 8, overflow: 'hidden' }}>
-          {(['KIOSK', 'POS', 'QR'] as const).map(mode => (
-            <button key={mode} onClick={() => setPreviewMode(mode)} style={{
-              padding: '8px 24px', border: 'none',
-              background: previewMode === mode ? '#ff6b35' : '#fff',
-              color: previewMode === mode ? '#fff' : '#666',
-              fontWeight: previewMode === mode ? 700 : 400,
-              cursor: 'pointer', fontSize: 13,
-            }}>
-              {mode === 'QR' ? 'QR오더' : mode}
-            </button>
-          ))}
+      {/* ── 우측: 프리뷰 + 레이아웃 패널 ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* 프리뷰 영역 */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24, overflow: 'auto' }}>
+          <div style={{ display: 'flex', gap: 0, marginBottom: 20, border: '1px solid #ddd', borderRadius: 8, overflow: 'hidden' }}>
+            {(['KIOSK', 'POS', 'QR'] as const).map(mode => (
+              <button key={mode} onClick={() => setPreviewMode(mode)} style={{
+                padding: '8px 24px', border: 'none',
+                background: previewMode === mode ? '#ff6b35' : '#fff',
+                color: previewMode === mode ? '#fff' : '#666',
+                fontWeight: previewMode === mode ? 700 : 400,
+                cursor: 'pointer', fontSize: 13,
+              }}>
+                {mode === 'QR' ? 'QR오더' : mode}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ color: '#aaa', fontSize: 11, marginBottom: 16 }}>
+            ※ 단말기에 실제로 표시되는 화면입니다
+          </div>
+
+          {previewMode === 'KIOSK' && <KioskPreview item={draft} allItems={previewItems} />}
+          {previewMode === 'POS' && <PosPreview item={draft} />}
+          {previewMode === 'QR' && (
+            <div style={{ color: '#aaa', padding: 40, textAlign: 'center' }}>
+              QR오더 프리뷰는 추후 구현 예정입니다
+            </div>
+          )}
         </div>
 
-        <div style={{ color: '#aaa', fontSize: 11, marginBottom: 16 }}>
-          ※ 단말기에 실제로 표시되는 화면입니다
-        </div>
-
-        {previewMode === 'KIOSK' && <KioskPreview item={draft} allItems={previewItems} />}
-        {previewMode === 'POS' && <PosPreview item={draft} />}
-        {previewMode === 'QR' && (
-          <div style={{ color: '#aaa', padding: 40, textAlign: 'center' }}>
-            QR오더 프리뷰는 추후 구현 예정입니다
+        {/* 레이아웃 설정 영역 */}
+        {selectedStore && (
+          <div style={{ borderTop: '1px solid #e0e0e0', background: '#fff', padding: '16px 24px' }}>
+            <LayoutSettingPanel storeId={selectedStore.id} />
           </div>
         )}
       </div>
