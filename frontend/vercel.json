@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://YOUR_BACKEND_SERVER_IP_OR_DOMAIN/api/:path*"
+      "destination": "http://54.180.246.95:8081/api/:path*"
     },
     {
       "source": "/(.*)",
