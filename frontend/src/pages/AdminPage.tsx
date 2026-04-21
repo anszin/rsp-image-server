@@ -100,7 +100,7 @@ export function AdminPage() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'Pretendard' }}>
+    <div style={{ display: 'flex', height: '100%', fontFamily: 'Pretendard' }}>
       {/* 좌측 트리 패널 */}
       <div style={{ width: 340, background: '#1e2a3a', color: '#e0e0e0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #2d3f55', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

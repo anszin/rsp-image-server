@@ -66,7 +66,7 @@ export function SlotEditorPage({ menuId, storeId, menuName }: Props) {
   const isLandscape = layout.orientation === 'LANDSCAPE';
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'Pretendard', background: '#f5f7fa' }}>
+    <div style={{ display: 'flex', height: '100%', fontFamily: 'Pretendard', background: '#f5f7fa' }}>
 
       {/* 좌측: 상품 목록 (드래그 소스) */}
       <div style={{ width: 220, background: '#fff', borderRight: '1px solid #e0e0e0', display: 'flex', flexDirection: 'column' }}>
