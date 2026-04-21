@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Item } from '../../types/menu';
 import { useLayoutStore } from '../../store/layoutStore';
+import { CategoryDto } from '../../api/storeApi';
 
 interface Props {
   item: Partial<Item>;
   allItems?: Item[];
+  categories?: CategoryDto[];
 }
 
 function KioskItemCard({ item, highlight, size }: { item: Partial<Item>; highlight?: boolean; size: number }) {
@@ -51,9 +53,10 @@ function KioskItemCard({ item, highlight, size }: { item: Partial<Item>; highlig
   );
 }
 
-export function KioskPreview({ item, allItems = [] }: Props) {
+export function KioskPreview({ item, allItems = [], categories = [] }: Props) {
   const { layout } = useLayoutStore();
   const [page, setPage] = useState(0);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
   // 레이아웃 변경 시 첫 페이지로 리셋
   const perPageKey = `${layout.columns}x${layout.rows}`;
@@ -64,11 +67,16 @@ export function KioskPreview({ item, allItems = [] }: Props) {
   const frameH = isLandscape ? 380 : 620;
 
   // 현재 편집 중 상품을 목록에 병합
-  const displayItems: Partial<Item>[] = allItems.length > 0 ? [...allItems] : [];
-  if (item.productCode && !displayItems.find(i => i.productCode === item.productCode)) {
-    displayItems.push(item);
+  const allDisplayItems: Partial<Item>[] = allItems.length > 0 ? [...allItems] : [];
+  if (item.productCode && !allDisplayItems.find(i => i.productCode === item.productCode)) {
+    allDisplayItems.push(item);
   }
-  if (displayItems.length === 0) displayItems.push(item);
+  if (allDisplayItems.length === 0) allDisplayItems.push(item);
+
+  // 카테고리 탭 필터링
+  const displayItems = selectedCategoryId
+    ? allDisplayItems.filter(i => i.categoryId === selectedCategoryId)
+    : allDisplayItems;
 
   const perPage = layout.columns * layout.rows;
   const totalPages = Math.max(1, Math.ceil(displayItems.length / perPage));
@@ -102,14 +110,17 @@ export function KioskPreview({ item, allItems = [] }: Props) {
 
       {/* 카테고리 탭 */}
       <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee', padding: '0 8px', flexShrink: 0, overflowX: 'auto' }}>
-        {['전체', item.categoryName || '카테고리'].map((tab, i) => (
-          <div key={tab} style={{
-            padding: '7px 12px', fontSize: 12, whiteSpace: 'nowrap',
-            fontWeight: i === 1 ? 700 : 400,
-            borderBottom: i === 1 ? '2px solid #ff6b35' : 'none',
-            color: i === 1 ? '#ff6b35' : '#666', cursor: 'pointer',
-          }}>{tab}</div>
-        ))}
+        {[{ id: null, name: '전체' }, ...categories].map(cat => {
+          const active = cat.id === selectedCategoryId;
+          return (
+            <div key={cat.id ?? 'all'} onClick={() => { setSelectedCategoryId(cat.id); setPage(0); }} style={{
+              padding: '7px 12px', fontSize: 12, whiteSpace: 'nowrap',
+              fontWeight: active ? 700 : 400,
+              borderBottom: active ? '2px solid #ff6b35' : 'none',
+              color: active ? '#ff6b35' : '#666', cursor: 'pointer',
+            }}>{cat.name}</div>
+          );
+        })}
       </div>
 
       {/* 그리드 */}
