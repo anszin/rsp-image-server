@@ -53,13 +53,17 @@ export function AdminPage() {
 
   const saveTenant = async () => {
     if (!tCode.trim() || !tName.trim()) { alert('코드와 이름을 입력하세요.'); return; }
-    if (editingTenant) {
-      await tenantApi.update(editingTenant.id, { code: tCode, name: tName, active: tActive });
-    } else {
-      await tenantApi.create({ code: tCode, name: tName });
+    try {
+      if (editingTenant) {
+        await tenantApi.update(editingTenant.id, { code: tCode, name: tName, active: tActive });
+      } else {
+        await tenantApi.create({ code: tCode, name: tName });
+      }
+      await loadTenants();
+      setView('tenant-list');
+    } catch (e: any) {
+      alert(e.response?.data?.message ?? e.message ?? '저장 실패. 서버 연결을 확인하세요.');
     }
-    await loadTenants();
-    setView('tenant-list');
   };
 
   const deleteTenant = async (id: number) => {
@@ -72,16 +76,20 @@ export function AdminPage() {
 
   const saveStore = async () => {
     if (!sCode.trim() || !sName.trim()) { alert('코드와 이름을 입력하세요.'); return; }
-    if (editingStore) {
-      await storeApi.update(editingStore.id, { code: sCode, name: sName, address: sAddress, description: sDesc, active: sActive });
-    } else {
-      await storeApi.create({ tenantId: selectedTenantId ?? undefined, code: sCode, name: sName, address: sAddress, description: sDesc });
+    try {
+      if (editingStore) {
+        await storeApi.update(editingStore.id, { code: sCode, name: sName, address: sAddress, description: sDesc, active: sActive });
+      } else {
+        await storeApi.create({ tenantId: selectedTenantId ?? undefined, code: sCode, name: sName, address: sAddress, description: sDesc });
+      }
+      if (selectedTenantId) {
+        const stores = await tenantApi.stores(selectedTenantId);
+        setTenantStores(prev => ({ ...prev, [selectedTenantId]: stores }));
+      }
+      setView('tenant-list');
+    } catch (e: any) {
+      alert(e.response?.data?.message ?? e.message ?? '저장 실패. 서버 연결을 확인하세요.');
     }
-    if (selectedTenantId) {
-      const stores = await tenantApi.stores(selectedTenantId);
-      setTenantStores(prev => ({ ...prev, [selectedTenantId]: stores }));
-    }
-    setView('tenant-list');
   };
 
   const deleteStore = async (tenantId: number, storeId: number) => {
