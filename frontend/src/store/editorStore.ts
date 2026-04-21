@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Item, OptionGroup, ItemStatus } from '../types/menu';
+import { Item, OptionGroup } from '../types/menu';
 
 interface EditorState {
   draft: Partial<Item>;

@@ -170,7 +170,7 @@ export function SlotEditorPage({ menuId, storeId, menuName }: Props) {
           <div style={{ background: '#fff', borderTop: '1px solid #eee', padding: '8px 14px', display: 'flex', justifyContent: 'center', gap: 12, alignItems: 'center' }}>
             <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={navBtnStyle}>◀</button>
             <span style={{ fontSize: 13, color: '#666' }}>페이지 {page + 1}</span>
-            <button onClick={() => setPage(p => p + 1)} style={navBtnStyle}>▶</button>
+            <button onClick={() => setPage(p => p + 1)} disabled={page >= totalPages - 1} style={navBtnStyle}>▶</button>
           </div>
         </div>
       </div>

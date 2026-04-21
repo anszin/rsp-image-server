@@ -1,5 +1,4 @@
 import React from 'react';
-import { OptionGroup } from '../../types/menu';
 import { useEditorStore } from '../../store/editorStore';
 
 export function OptionGroupEditor() {

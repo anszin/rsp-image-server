@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Item, OptionGroup, OptionValue } from '../../types/menu';
+import { Item } from '../../types/menu';
 
 interface Props {
   item: Partial<Item>;

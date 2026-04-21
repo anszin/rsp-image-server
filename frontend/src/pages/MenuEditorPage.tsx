@@ -7,7 +7,7 @@ import { LayoutSettingPanel } from '../components/editor/LayoutSettingPanel';
 import { KioskPreview } from '../components/preview/KioskPreview';
 import { PosPreview } from '../components/preview/PosPreview';
 import { itemApi } from '../api/itemApi';
-import { tenantApi, storeApi, menuApi, categoryApi2, layoutApi, TenantDto, StoreDto, MenuDto, CategoryDto } from '../api/storeApi';
+import { tenantApi, menuApi, categoryApi2, layoutApi, TenantDto, StoreDto, MenuDto, CategoryDto } from '../api/storeApi';
 import { Item, ItemStatus } from '../types/menu';
 
 interface Props {
@@ -16,7 +16,7 @@ interface Props {
 
 export function MenuEditorPage({ onOpenSlotEditor }: Props) {
   const { draft, setField, previewMode, setPreviewMode, reset } = useEditorStore();
-  const { layout, setLayout } = useLayoutStore();
+  const { setLayout } = useLayoutStore();
 
   // 선택 상태
   const [tenants, setTenants] = useState<TenantDto[]>([]);
@@ -62,7 +62,7 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
       if (list.length > 0) setSelectedMenu(list[0]);
     });
     layoutApi.get(selectedStore.id).then(setLayout).catch(() => {});
-  }, [selectedStore]);
+  }, [selectedStore, setLayout]);
 
   // 메뉴 선택 시 카테고리 + 전체 상품 조회
   useEffect(() => {
