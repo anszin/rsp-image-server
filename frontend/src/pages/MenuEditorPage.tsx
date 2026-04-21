@@ -341,7 +341,7 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
       </div>
 
       {/* ── 우측: 프리뷰 + 레이아웃 패널 ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
 
         {/* 프리뷰 영역 */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24, overflow: 'auto' }}>
@@ -374,7 +374,7 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
 
         {/* 레이아웃 설정 영역 */}
         {selectedStore && (
-          <div style={{ borderTop: '1px solid #e0e0e0', background: '#fff', padding: '16px 24px' }}>
+          <div style={{ width: 260, borderLeft: '1px solid #e0e0e0', background: '#fff', padding: '16px', overflowY: 'auto', flexShrink: 0 }}>
             <LayoutSettingPanel storeId={selectedStore.id} />
           </div>
         )}
