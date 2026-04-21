@@ -81,6 +81,7 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
 
   const handleSave = async () => {
     try {
+      const savedCategoryId = draft.categoryId;
       if (draft.id) {
         await itemApi.update(draft.id, draft);
         alert('저장되었습니다.');
@@ -89,7 +90,7 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
         alert('등록되었습니다.');
         reset();
       }
-      refreshItems(draft.categoryId);
+      refreshItems(savedCategoryId);
     } catch (e: any) {
       alert('오류: ' + (e.response?.data?.message ?? e.message));
     }
