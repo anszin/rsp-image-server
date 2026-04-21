@@ -363,7 +363,7 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
             ※ 단말기에 실제로 표시되는 화면입니다
           </div>
 
-          {previewMode === 'KIOSK' && <KioskPreview item={draft} allItems={previewItems} categories={categories} />}
+          {previewMode === 'KIOSK' && <KioskPreview item={draft} allItems={previewItems} categories={categories} activeCategoryId={draft.categoryId ?? null} />}
           {previewMode === 'POS' && <PosPreview item={draft} />}
           {previewMode === 'QR' && (
             <div style={{ color: '#aaa', padding: 40, textAlign: 'center' }}>

@@ -7,6 +7,7 @@ interface Props {
   item: Partial<Item>;
   allItems?: Item[];
   categories?: CategoryDto[];
+  activeCategoryId?: number | null;
 }
 
 function KioskItemCard({ item, highlight, size }: { item: Partial<Item>; highlight?: boolean; size: number }) {
@@ -53,7 +54,7 @@ function KioskItemCard({ item, highlight, size }: { item: Partial<Item>; highlig
   );
 }
 
-export function KioskPreview({ item, allItems = [], categories = [] }: Props) {
+export function KioskPreview({ item, allItems = [], categories = [], activeCategoryId }: Props) {
   const { layout } = useLayoutStore();
   const [page, setPage] = useState(0);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
@@ -62,7 +63,15 @@ export function KioskPreview({ item, allItems = [], categories = [] }: Props) {
   const perPageKey = `${layout.columns}x${layout.rows}`;
   React.useEffect(() => { setPage(0); }, [perPageKey]);
 
-  // 카테고리 목록 변경 시 선택된 카테고리가 없으면 유지, 사라진 경우 전체로 리셋
+  // 드롭다운에서 카테고리 선택 시 탭 동기화
+  React.useEffect(() => {
+    if (activeCategoryId !== undefined) {
+      setSelectedCategoryId(activeCategoryId ?? null);
+      setPage(0);
+    }
+  }, [activeCategoryId]);
+
+  // 카테고리 목록 변경 시 선택된 카테고리가 사라진 경우 전체로 리셋
   React.useEffect(() => {
     if (selectedCategoryId !== null && !categories.find(c => c.id === selectedCategoryId)) {
       setSelectedCategoryId(null);
