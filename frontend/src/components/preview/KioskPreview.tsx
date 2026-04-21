@@ -62,6 +62,13 @@ export function KioskPreview({ item, allItems = [], categories = [] }: Props) {
   const perPageKey = `${layout.columns}x${layout.rows}`;
   React.useEffect(() => { setPage(0); }, [perPageKey]);
 
+  // 카테고리 목록 변경 시 선택된 카테고리가 없으면 유지, 사라진 경우 전체로 리셋
+  React.useEffect(() => {
+    if (selectedCategoryId !== null && !categories.find(c => c.id === selectedCategoryId)) {
+      setSelectedCategoryId(null);
+    }
+  }, [categories, selectedCategoryId]);
+
   const isLandscape = layout.orientation === 'LANDSCAPE';
   const frameW = isLandscape ? 560 : 340;
   const frameH = isLandscape ? 380 : 620;
