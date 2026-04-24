@@ -100,16 +100,17 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
 
   const handleSave = async () => {
     try {
-      const savedCategoryId = draft.categoryId;
       if (draft.id) {
-        await itemApi.update(draft.id, draft);
+        const updated = await itemApi.update(draft.id, draft);
+        loadItem(updated);
         alert('저장되었습니다.');
+        refreshItems(updated.categoryId);
       } else {
-        await itemApi.create(draft);
+        const created = await itemApi.create(draft);
         alert('등록되었습니다.');
         reset();
+        refreshItems(created.categoryId);
       }
-      refreshItems(savedCategoryId);
     } catch (e: any) {
       alert('오류: ' + (e.response?.data?.message ?? e.message));
     }

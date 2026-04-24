@@ -21,6 +21,7 @@ public class ItemDto {
     }
 
     @Getter
+    @Setter
     @NoArgsConstructor
     public static class UpdateRequest {
         @NotBlank private String name;
