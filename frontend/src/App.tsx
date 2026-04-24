@@ -14,7 +14,7 @@ function App() {
       {/* GNB */}
       <div style={{ height: 44, background: '#1e2a3a', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 4, flexShrink: 0 }}>
         <span style={{ color: '#ff6b35', fontWeight: 700, fontSize: 15, marginRight: 16 }}>F&B Menu</span>
-        <NavBtn active={page === 'menu-editor'} onClick={() => setPage('menu-editor')}>메뉴 등록</NavBtn>
+        <NavBtn active={page === 'menu-editor'} onClick={() => setPage('menu-editor')}>메뉴 관리</NavBtn>
         <NavBtn active={page === 'admin'} onClick={() => setPage('admin')}>관리자</NavBtn>
         {slotCtx && (
           <NavBtn active={page === 'slot-editor'} onClick={() => setPage('slot-editor')}>
