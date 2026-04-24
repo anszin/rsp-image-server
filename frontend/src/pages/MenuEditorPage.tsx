@@ -4,21 +4,15 @@ import { useLayoutStore } from '../store/layoutStore';
 import { OptionGroupEditor } from '../components/editor/OptionGroupEditor';
 import { ImageUploader } from '../components/editor/ImageUploader';
 import { LayoutSettingPanel } from '../components/editor/LayoutSettingPanel';
-import { KioskPreview } from '../components/preview/KioskPreview';
-import { PosPreview } from '../components/preview/PosPreview';
 import { itemApi } from '../api/itemApi';
-import { tenantApi, menuApi, categoryApi2, layoutApi, TenantDto, StoreDto, MenuDto, CategoryDto } from '../api/storeApi';
+import { tenantApi, menuApi, categoryApi2, layoutApi, slotApi, TenantDto, StoreDto, MenuDto, CategoryDto, SlotDto } from '../api/storeApi';
 import { Item, ItemStatus } from '../types/menu';
 
 type MainTab = 'products' | 'layout';
 
-interface Props {
-  onOpenSlotEditor?: (menuId: number, storeId: number, menuName: string) => void;
-}
-
-export function MenuEditorPage({ onOpenSlotEditor }: Props) {
-  const { draft, setField, previewMode, setPreviewMode, reset, loadItem } = useEditorStore();
-  const { setLayout } = useLayoutStore();
+export function MenuEditorPage() {
+  const { draft, setField, reset, loadItem } = useEditorStore();
+  const { layout, setLayout } = useLayoutStore();
 
   const [tenants, setTenants] = useState<TenantDto[]>([]);
   const [selectedTenant, setSelectedTenant] = useState<TenantDto | null>(null);
@@ -31,6 +25,13 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
 
   const [mainTab, setMainTab] = useState<MainTab>('products');
   const [filterCategoryId, setFilterCategoryId] = useState<number | null>(null);
+
+  // 슬롯 편집 상태
+  const [slots, setSlots] = useState<SlotDto[]>([]);
+  const [slotPage, setSlotPage] = useState(0);
+  const [selectedSlot, setSelectedSlot] = useState<{ row: number; col: number } | null>(null);
+  const [showItemPicker, setShowItemPicker] = useState(false);
+  const [dragItemId, setDragItemId] = useState<number | null>(null);
 
   const [showMenuMgr, setShowMenuMgr] = useState(false);
   const [newMenuName, setNewMenuName] = useState('');
@@ -68,12 +69,50 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
     if (!selectedStore || !selectedMenu) return;
     categoryApi2.list(selectedStore.id, selectedMenu.id).then(setCategories);
     itemApi.listByMenu(selectedMenu.id).then(setPreviewItems).catch(() => {});
+    slotApi.list(selectedMenu.id).then(setSlots).catch(() => {});
+    setSlotPage(0);
   }, [selectedStore, selectedMenu]);
 
   const refreshItems = () => {
     if (selectedMenu) {
       itemApi.listByMenu(selectedMenu.id).then(setPreviewItems).catch(() => {});
     }
+  };
+
+  const refreshSlots = () => {
+    if (selectedMenu) slotApi.list(selectedMenu.id).then(setSlots).catch(() => {});
+  };
+
+  const getSlot = (row: number, col: number) =>
+    slots.find(s => s.page === slotPage && s.row === row && s.col === col);
+
+  const handleSlotClick = (row: number, col: number) => {
+    if (getSlot(row, col)?.itemId) return;
+    setSelectedSlot({ row, col });
+    setShowItemPicker(true);
+  };
+
+  const handleSlotRightClick = async (e: React.MouseEvent, row: number, col: number) => {
+    e.preventDefault();
+    if (!selectedMenu || !getSlot(row, col)?.itemId) return;
+    await slotApi.clear(selectedMenu.id, slotPage, row, col);
+    refreshSlots();
+  };
+
+  const handleAssignItem = async (itemId: number) => {
+    if (!selectedSlot || !selectedMenu) return;
+    await slotApi.assign(selectedMenu.id, slotPage, selectedSlot.row, selectedSlot.col, itemId);
+    refreshSlots();
+    setShowItemPicker(false);
+    setSelectedSlot(null);
+  };
+
+  const handleSlotDrop = async (e: React.DragEvent, row: number, col: number) => {
+    e.preventDefault();
+    if (dragItemId == null || !selectedMenu) return;
+    await slotApi.assign(selectedMenu.id, slotPage, row, col, dragItemId);
+    refreshSlots();
+    setDragItemId(null);
   };
 
   const filteredItems = filterCategoryId
@@ -451,49 +490,159 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
         {/* ━━━ 메뉴 배치 탭 ━━━ */}
         {mainTab === 'layout' && (
           <>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24, overflow: 'auto' }}>
-              {/* 프리뷰 모드 탭 */}
-              <div style={{ display: 'flex', border: '1px solid #ddd', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
-                {(['KIOSK', 'POS', 'QR'] as const).map(mode => (
-                  <button key={mode} onClick={() => setPreviewMode(mode)} style={{
-                    padding: '7px 22px', border: 'none',
-                    background: previewMode === mode ? '#ff6b35' : '#fff',
-                    color: previewMode === mode ? '#fff' : '#666',
-                    fontWeight: previewMode === mode ? 700 : 400,
-                    cursor: 'pointer', fontSize: 13,
-                  }}>{mode === 'QR' ? 'QR오더' : mode}</button>
-                ))}
+            {/* 상품 목록 (드래그 소스) */}
+            <div style={{ width: 200, background: '#fff', borderRight: '1px solid #e0e0e0', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+              <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', fontSize: 11, fontWeight: 700, color: '#aaa', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                상품 목록
               </div>
-
-              <div style={{ fontSize: 11, color: '#aaa', marginBottom: 14 }}>
-                ※ 단말기에 실제로 표시되는 화면입니다
+              <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+                {previewItems.length === 0
+                  ? <Empty>상품이 없습니다</Empty>
+                  : previewItems.map(item => (
+                    <div key={item.id} draggable
+                      onDragStart={() => setDragItemId(item.id!)}
+                      onDragEnd={() => setDragItemId(null)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '7px 9px', marginBottom: 5, borderRadius: 7,
+                        border: `1px solid ${dragItemId === item.id ? '#ff6b35' : '#e8e8e8'}`,
+                        background: dragItemId === item.id ? '#fff8f5' : '#fff',
+                        cursor: 'grab', fontSize: 13,
+                      }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 5, flexShrink: 0,
+                        background: item.imageUrls?.[0] ? `url(${item.imageUrls[0]}) center/cover` : '#ffe8d6',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                      }}>
+                        {!item.imageUrls?.[0] && '🍽️'}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                        <div style={{ fontSize: 11, color: '#ff6b35' }}>{Number(item.price).toLocaleString()}원</div>
+                      </div>
+                    </div>
+                  ))
+                }
               </div>
-
-              {previewMode === 'KIOSK' && (
-                <KioskPreview item={draft} allItems={previewItems} categories={categories}
-                  activeCategoryId={null}
-                  onItemClick={item => { if (item.id) { loadItem(item as Item); setMainTab('products'); } }} />
-              )}
-              {previewMode === 'POS' && <PosPreview item={draft} />}
-              {previewMode === 'QR' && (
-                <div style={{ color: '#aaa', padding: 40, textAlign: 'center' }}>QR오더 프리뷰는 추후 구현 예정입니다</div>
-              )}
-
-              {selectedMenu && onOpenSlotEditor && (
-                <button
-                  onClick={() => onOpenSlotEditor(selectedMenu.id, selectedStore!.id, selectedMenu.name)}
-                  style={{ marginTop: 20, padding: '10px 28px', background: '#1e2a3a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
-                  🗂 슬롯 편집 (드래그&드롭 배치)
-                </button>
-              )}
             </div>
 
+            {/* 슬롯 그리드 */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24, overflow: 'auto', background: '#f5f7fa' }}>
+              {!selectedMenu
+                ? <Empty>메뉴판을 선택하세요</Empty>
+                : (
+                  <>
+                    <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>
+                      클릭: 상품 배치 &nbsp;|&nbsp; 우클릭: 제거 &nbsp;|&nbsp; 드래그: 목록에서 끌어다 놓기
+                    </div>
+
+                    {/* 슬롯 프레임 */}
+                    <div style={{
+                      border: '6px solid #333', borderRadius: 14, overflow: 'hidden',
+                      background: '#f9f9f9',
+                      width: layout.orientation === 'LANDSCAPE' ? 640 : 380,
+                      transition: 'width 0.3s',
+                    }}>
+                      {/* 헤더 */}
+                      <div style={{ background: '#ff6b35', color: '#fff', padding: '8px 14px', fontWeight: 700, fontSize: 14 }}>
+                        {selectedMenu.name}
+                        <span style={{ float: 'right', fontSize: 11, opacity: 0.8 }}>{layout.columns}×{layout.rows}</span>
+                      </div>
+
+                      {/* 그리드 */}
+                      <div style={{ padding: 10 }}>
+                        {Array.from({ length: layout.rows }).map((_, rowIdx) => (
+                          <div key={rowIdx} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                            {Array.from({ length: layout.columns }).map((_, colIdx) => {
+                              const slot = getSlot(rowIdx, colIdx);
+                              const hasItem = !!slot?.itemId;
+                              return (
+                                <div key={colIdx}
+                                  onClick={() => handleSlotClick(rowIdx, colIdx)}
+                                  onContextMenu={e => handleSlotRightClick(e, rowIdx, colIdx)}
+                                  onDragOver={e => e.preventDefault()}
+                                  onDrop={e => handleSlotDrop(e, rowIdx, colIdx)}
+                                  style={{
+                                    flex: 1, height: layout.orientation === 'LANDSCAPE' ? 110 : 130,
+                                    border: hasItem ? '2px solid #ff6b35' : '2px dashed #ddd',
+                                    borderRadius: 8, background: hasItem ? '#fff' : '#fafafa',
+                                    cursor: hasItem ? 'context-menu' : 'pointer',
+                                    display: 'flex', flexDirection: 'column',
+                                    alignItems: 'center', justifyContent: 'center',
+                                    overflow: 'hidden', position: 'relative',
+                                  }}>
+                                  {hasItem ? (
+                                    <>
+                                      {slot.imageUrl
+                                        ? <img src={slot.imageUrl} alt="" style={{ width: '100%', height: 60, objectFit: 'cover' }} />
+                                        : <div style={{ fontSize: 28, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🍽️</div>
+                                      }
+                                      <div style={{ padding: '4px 6px', width: '100%', textAlign: 'center' }}>
+                                        <div style={{ fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{slot.itemName}</div>
+                                        <div style={{ fontSize: 11, color: '#ff6b35' }}>{slot.itemPrice?.toLocaleString()}원</div>
+                                      </div>
+                                      {slot.itemStatus === 'SOLD_OUT' && (
+                                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12 }}>품절</div>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <span style={{ color: '#ccc', fontSize: 24 }}>+</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 페이지 네비게이션 */}
+                      <div style={{ background: '#fff', borderTop: '1px solid #eee', padding: '8px 14px', display: 'flex', justifyContent: 'center', gap: 12, alignItems: 'center' }}>
+                        <button onClick={() => setSlotPage(p => Math.max(0, p - 1))} disabled={slotPage === 0} style={navBtnStyle}>◀</button>
+                        <span style={{ fontSize: 13, color: '#666' }}>페이지 {slotPage + 1}</span>
+                        <button onClick={() => setSlotPage(p => p + 1)} style={navBtnStyle}>▶</button>
+                      </div>
+                    </div>
+                  </>
+                )
+              }
+            </div>
+
+            {/* 레이아웃 설정 */}
             {selectedStore && (
               <div style={{ width: 260, borderLeft: '1px solid #e0e0e0', background: '#fff', padding: 16, overflowY: 'auto', flexShrink: 0 }}>
                 <LayoutSettingPanel storeId={selectedStore.id} />
               </div>
             )}
           </>
+        )}
+
+        {/* 상품 선택 팝업 */}
+        {showItemPicker && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
+            onClick={() => setShowItemPicker(false)}>
+            <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 360, maxHeight: 480, display: 'flex', flexDirection: 'column' }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>배치할 상품 선택</div>
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                {previewItems.map(item => (
+                  <div key={item.id} onClick={() => handleAssignItem(item.id!)}
+                    style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#fff8f5')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{item.name}</div>
+                      <div style={{ fontSize: 12, color: '#aaa' }}>{item.productCode}</div>
+                    </div>
+                    <div style={{ color: '#ff6b35', fontWeight: 700 }}>{Number(item.price).toLocaleString()}원</div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setShowItemPicker(false)}
+                style={{ marginTop: 12, padding: 8, border: '1px solid #ddd', borderRadius: 6, cursor: 'pointer', background: '#f5f5f5' }}>
+                취소
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -559,4 +708,8 @@ const smBtnStyle: React.CSSProperties = {
 const iconBtnStyle: React.CSSProperties = {
   padding: '2px 5px', background: 'none', border: 'none',
   cursor: 'pointer', fontSize: 13, color: '#888',
+};
+const navBtnStyle: React.CSSProperties = {
+  padding: '4px 12px', border: '1px solid #ddd', borderRadius: 5,
+  cursor: 'pointer', background: '#fff', fontSize: 13,
 };
