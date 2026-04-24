@@ -29,6 +29,7 @@ export function MenuEditorPage() {
   // 슬롯 편집 상태
   const [slots, setSlots] = useState<SlotDto[]>([]);
   const [slotPage, setSlotPage] = useState(0);
+  const [slotCategoryId, setSlotCategoryId] = useState<number | null>(null); // null = 전체
   const [selectedSlot, setSelectedSlot] = useState<{ row: number; col: number } | null>(null);
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [dragItemId, setDragItemId] = useState<number | null>(null);
@@ -71,6 +72,7 @@ export function MenuEditorPage() {
     itemApi.listByMenu(selectedMenu.id).then(setPreviewItems).catch(() => {});
     slotApi.list(selectedMenu.id).then(setSlots).catch(() => {});
     setSlotPage(0);
+    setSlotCategoryId(null);
   }, [selectedStore, selectedMenu]);
 
   const refreshItems = () => {
@@ -562,14 +564,18 @@ export function MenuEditorPage() {
 
                         {/* 카테고리 탭 */}
                         <div style={{ height: tabH, display: 'flex', background: '#fff', borderBottom: '1px solid #eee', padding: '0 8px', flexShrink: 0, overflowX: 'auto', alignItems: 'flex-end' }}>
-                          {[{ id: -1, name: '전체' }, ...categories].map((cat, i) => (
-                            <div key={cat.id} style={{
-                              padding: '6px 10px', fontSize: 11, whiteSpace: 'nowrap', cursor: 'default',
-                              fontWeight: i === 0 ? 700 : 400,
-                              color: i === 0 ? '#ff6b35' : '#888',
-                              borderBottom: i === 0 ? '2px solid #ff6b35' : 'none',
-                            }}>{cat.name}</div>
-                          ))}
+                          {[{ id: null as number | null, name: '전체' }, ...categories.map(c => ({ id: c.id as number | null, name: c.name }))].map(cat => {
+                            const active = cat.id === slotCategoryId;
+                            return (
+                              <div key={cat.id ?? 'all'} onClick={() => { setSlotCategoryId(cat.id); setSlotPage(0); }} style={{
+                                padding: '6px 10px', fontSize: 11, whiteSpace: 'nowrap', cursor: 'pointer',
+                                fontWeight: active ? 700 : 400,
+                                color: active ? '#ff6b35' : '#888',
+                                borderBottom: active ? '2px solid #ff6b35' : '2px solid transparent',
+                                userSelect: 'none',
+                              }}>{cat.name}</div>
+                            );
+                          })}
                         </div>
 
                         {/* 슬롯 그리드 */}
@@ -581,20 +587,23 @@ export function MenuEditorPage() {
                                 const hasItem = !!slot?.itemId;
                                 return (
                                   <div key={colIdx}
-                                    onClick={() => handleSlotClick(rowIdx, colIdx)}
-                                    onContextMenu={e => handleSlotRightClick(e, rowIdx, colIdx)}
-                                    onDragOver={e => e.preventDefault()}
-                                    onDrop={e => handleSlotDrop(e, rowIdx, colIdx)}
-                                    title={hasItem ? '우클릭으로 제거' : '클릭하여 상품 배치'}
+                                    onClick={() => hasItem ? undefined : (slotCategoryId !== null && handleSlotClick(rowIdx, colIdx))}
+                                    onContextMenu={e => hasItem ? handleSlotRightClick(e, rowIdx, colIdx) : e.preventDefault()}
+                                    onDragOver={e => slotCategoryId !== null && e.preventDefault()}
+                                    onDrop={e => slotCategoryId !== null && handleSlotDrop(e, rowIdx, colIdx)}
+                                    title={hasItem ? '우클릭으로 제거' : slotCategoryId !== null ? '클릭하여 상품 배치' : undefined}
                                     style={{
                                       width: cellSize, height: cellSize, flexShrink: 0,
-                                      border: hasItem ? '1px solid #e0e0e0' : '1.5px dashed #ccc',
+                                      border: hasItem
+                                        ? '1px solid #e0e0e0'
+                                        : slotCategoryId !== null
+                                          ? '1.5px dashed #bbb'
+                                          : '1px solid #f0f0f0',
                                       borderRadius: 8,
-                                      background: hasItem ? '#fff' : 'rgba(255,255,255,0.6)',
-                                      cursor: hasItem ? 'context-menu' : 'pointer',
+                                      background: hasItem ? '#fff' : '#fafafa',
+                                      cursor: hasItem ? 'context-menu' : slotCategoryId !== null ? 'pointer' : 'default',
                                       display: 'flex', flexDirection: 'column',
                                       overflow: 'hidden', position: 'relative',
-                                      transition: 'border-color 0.15s',
                                     }}>
                                     {hasItem ? (
                                       <>
@@ -616,9 +625,9 @@ export function MenuEditorPage() {
                                           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 11 }}>품절</div>
                                         )}
                                       </>
-                                    ) : (
-                                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d0d0d0', fontSize: 20 }}>+</div>
-                                    )}
+                                    ) : slotCategoryId !== null ? (
+                                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc', fontSize: 20 }}>+</div>
+                                    ) : null}
                                   </div>
                                 );
                               })}
@@ -633,7 +642,9 @@ export function MenuEditorPage() {
                             <span style={{ fontSize: 12, color: '#888' }}>{slotPage + 1} 페이지</span>
                             <button onClick={() => setSlotPage(p => p + 1)} style={navBtnStyle}>▶</button>
                           </div>
-                          <span style={{ fontSize: 10, color: '#bbb' }}>클릭: 배치 | 우클릭: 제거 | 드래그: 놓기</span>
+                          <span style={{ fontSize: 10, color: '#bbb' }}>
+                            {slotCategoryId !== null ? '클릭: 배치 | 우클릭: 제거 | 드래그: 놓기' : '카테고리 탭 선택 시 배치 가능'}
+                          </span>
                         </div>
                       </div>
                     );
@@ -656,9 +667,14 @@ export function MenuEditorPage() {
             onClick={() => setShowItemPicker(false)}>
             <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 360, maxHeight: 480, display: 'flex', flexDirection: 'column' }}
               onClick={e => e.stopPropagation()}>
-              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>배치할 상품 선택</div>
+              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>배치할 상품 선택</div>
+              {slotCategoryId !== null && (
+                <div style={{ fontSize: 12, color: '#aaa', marginBottom: 12 }}>
+                  {categories.find(c => c.id === slotCategoryId)?.name} 카테고리
+                </div>
+              )}
               <div style={{ flex: 1, overflowY: 'auto' }}>
-                {previewItems.map(item => (
+                {(slotCategoryId !== null ? previewItems.filter(i => i.categoryId === slotCategoryId) : previewItems).map(item => (
                   <div key={item.id} onClick={() => handleAssignItem(item.id!)}
                     style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                     onMouseEnter={e => (e.currentTarget.style.background = '#fff8f5')}
