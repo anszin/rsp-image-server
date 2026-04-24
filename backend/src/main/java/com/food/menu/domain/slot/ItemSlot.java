@@ -1,13 +1,15 @@
 package com.food.menu.domain.slot;
 
 import com.food.menu.domain.item.Item;
+import com.food.menu.domain.menu.Category;
 import com.food.menu.domain.menu.Menu;
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
 @Table(name = "food_item_slot",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"menu_id", "page", "row_idx", "col_idx"}))
+       uniqueConstraints = @UniqueConstraint(name = "uq_food_item_slot_pos",
+               columnNames = {"menu_id", "category_id", "page", "row_idx", "col_idx"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ItemSlot {
@@ -18,6 +20,10 @@ public class ItemSlot {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "menu_id", nullable = false)
     private Menu menu;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
 
     private int page;
 
@@ -32,8 +38,9 @@ public class ItemSlot {
     private Item item;
 
     @Builder
-    public ItemSlot(Menu menu, int page, int row, int col, Item item) {
+    public ItemSlot(Menu menu, Category category, int page, int row, int col, Item item) {
         this.menu = menu;
+        this.category = category;
         this.page = page;
         this.row = row;
         this.col = col;

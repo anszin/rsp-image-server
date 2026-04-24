@@ -3,6 +3,8 @@ package com.food.menu.api.admin;
 import com.food.menu.common.dto.ApiResponse;
 import com.food.menu.domain.item.Item;
 import com.food.menu.domain.item.ItemRepository;
+import com.food.menu.domain.menu.Category;
+import com.food.menu.domain.menu.CategoryRepository;
 import com.food.menu.domain.menu.Menu;
 import com.food.menu.domain.menu.MenuRepository;
 import com.food.menu.domain.slot.ItemSlot;
@@ -11,9 +13,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -25,26 +27,37 @@ public class SlotController {
 
     private final ItemSlotRepository slotRepository;
     private final MenuRepository menuRepository;
+    private final CategoryRepository categoryRepository;
     private final ItemRepository itemRepository;
 
     @GetMapping
     @Transactional(readOnly = true)
-    public ApiResponse<List<SlotDto>> list(@PathVariable Long menuId) {
-        return ApiResponse.ok(slotRepository.findByMenuIdWithItem(menuId).stream().map(SlotDto::from).toList());
+    public ApiResponse<List<SlotDto>> list(
+            @PathVariable Long menuId,
+            @RequestParam Long categoryId) {
+        return ApiResponse.ok(
+                slotRepository.findByMenuIdAndCategoryIdWithItem(menuId, categoryId)
+                        .stream().map(SlotDto::from).toList());
     }
 
-    @PutMapping("/{page}/{row}/{col}")
+    @PutMapping("/{categoryId}/{page}/{row}/{col}")
     @Transactional
     public ApiResponse<SlotDto> assign(
             @PathVariable Long menuId,
+            @PathVariable Long categoryId,
             @PathVariable int page, @PathVariable int row, @PathVariable int col,
             @RequestBody AssignRequest req) {
 
         Menu menu = menuRepository.findById(menuId)
                 .orElseThrow(() -> new IllegalArgumentException("메뉴판을 찾을 수 없습니다: " + menuId));
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new IllegalArgumentException("카테고리를 찾을 수 없습니다: " + categoryId));
 
-        ItemSlot slot = slotRepository.findByMenuIdAndPageAndRowAndCol(menuId, page, row, col)
-                .orElseGet(() -> ItemSlot.builder().menu(menu).page(page).row(row).col(col).build());
+        ItemSlot slot = slotRepository.findByMenuIdAndCategoryIdAndPageAndRowAndCol(menuId, categoryId, page, row, col)
+                .orElseGet(() -> ItemSlot.builder()
+                        .menu(menu).category(category)
+                        .page(page).row(row).col(col)
+                        .build());
 
         if (req.getItemId() == null) {
             slot.clearItem();
@@ -57,17 +70,18 @@ public class SlotController {
         return ApiResponse.ok(SlotDto.from(slotRepository.save(slot)));
     }
 
-    @DeleteMapping("/{page}/{row}/{col}")
+    @DeleteMapping("/{categoryId}/{page}/{row}/{col}")
     @Transactional
     public ApiResponse<Void> clear(
             @PathVariable Long menuId,
+            @PathVariable Long categoryId,
             @PathVariable int page, @PathVariable int row, @PathVariable int col) {
-        slotRepository.findByMenuIdAndPageAndRowAndCol(menuId, page, row, col)
+        slotRepository.findByMenuIdAndCategoryIdAndPageAndRowAndCol(menuId, categoryId, page, row, col)
                 .ifPresent(slotRepository::delete);
         return ApiResponse.ok(null);
     }
 
-    @Getter @NoArgsConstructor
+    @Getter @Setter @NoArgsConstructor
     public static class AssignRequest {
         private Long itemId;
     }
@@ -78,6 +92,7 @@ public class SlotController {
         private int page;
         private int row;
         private int col;
+        private Long categoryId;
         private Long itemId;
         private String itemName;
         private BigDecimal itemPrice;
@@ -89,6 +104,7 @@ public class SlotController {
             return SlotDto.builder()
                     .id(s.getId())
                     .page(s.getPage()).row(s.getRow()).col(s.getCol())
+                    .categoryId(s.getCategory().getId())
                     .itemId(item != null ? item.getId() : null)
                     .itemName(item != null ? item.getName() : null)
                     .itemPrice(item != null ? item.getPrice() : null)

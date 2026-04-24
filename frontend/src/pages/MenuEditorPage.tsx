@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { useLayoutStore } from '../store/layoutStore';
 import { OptionGroupEditor } from '../components/editor/OptionGroupEditor';
@@ -29,10 +29,12 @@ export function MenuEditorPage() {
   // 슬롯 편집 상태
   const [slots, setSlots] = useState<SlotDto[]>([]);
   const [slotPage, setSlotPage] = useState(0);
-  const [slotCategoryId, setSlotCategoryId] = useState<number | null>(null); // null = 전체
+  // null = 전체(자동배열), number = 카테고리별 슬롯 편집
+  const [slotCategoryId, setSlotCategoryId] = useState<number | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{ row: number; col: number } | null>(null);
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [dragItemId, setDragItemId] = useState<number | null>(null);
+  const [dragSlot, setDragSlot] = useState<{ row: number; col: number } | null>(null);
 
   const [showMenuMgr, setShowMenuMgr] = useState(false);
   const [newMenuName, setNewMenuName] = useState('');
@@ -70,10 +72,20 @@ export function MenuEditorPage() {
     if (!selectedStore || !selectedMenu) return;
     categoryApi2.list(selectedStore.id, selectedMenu.id).then(setCategories);
     itemApi.listByMenu(selectedMenu.id).then(setPreviewItems).catch(() => {});
-    slotApi.list(selectedMenu.id).then(setSlots).catch(() => {});
     setSlotPage(0);
     setSlotCategoryId(null);
+    setSlots([]);
   }, [selectedStore, selectedMenu]);
+
+  // 카테고리 탭 변경 시 해당 카테고리 슬롯 로드
+  useEffect(() => {
+    setSlotPage(0);
+    if (slotCategoryId !== null && selectedMenu) {
+      slotApi.list(selectedMenu.id, slotCategoryId).then(setSlots).catch(() => setSlots([]));
+    } else {
+      setSlots([]);
+    }
+  }, [slotCategoryId, selectedMenu]);
 
   const refreshItems = () => {
     if (selectedMenu) {
@@ -82,20 +94,13 @@ export function MenuEditorPage() {
   };
 
   const refreshSlots = () => {
-    if (selectedMenu) slotApi.list(selectedMenu.id).then(setSlots).catch(() => {});
+    if (selectedMenu && slotCategoryId !== null) {
+      slotApi.list(selectedMenu.id, slotCategoryId).then(setSlots).catch(() => setSlots([]));
+    }
   };
 
   const getSlot = (row: number, col: number) =>
     slots.find(s => s.page === slotPage && s.row === row && s.col === col);
-
-  // 셀 표시 상태: 'item' | 'empty-add' | 'empty-fill' | 'other-category'
-  const getCellState = (row: number, col: number) => {
-    const slot = getSlot(row, col);
-    if (!slot?.itemId) return slotCategoryId !== null ? 'empty-add' : 'empty-fill';
-    if (slotCategoryId === null) return 'item';
-    const item = previewItems.find(i => i.id === slot.itemId);
-    return item?.categoryId === slotCategoryId ? 'item' : 'other-category';
-  };
 
   const handleSlotClick = (row: number, col: number) => {
     if (getSlot(row, col)?.itemId) return;
@@ -105,26 +110,70 @@ export function MenuEditorPage() {
 
   const handleSlotRightClick = async (e: React.MouseEvent, row: number, col: number) => {
     e.preventDefault();
-    if (!selectedMenu || !getSlot(row, col)?.itemId) return;
-    await slotApi.clear(selectedMenu.id, slotPage, row, col);
+    if (!selectedMenu || slotCategoryId === null || !getSlot(row, col)?.itemId) return;
+    await slotApi.clear(selectedMenu.id, slotCategoryId, slotPage, row, col);
     refreshSlots();
   };
 
   const handleAssignItem = async (itemId: number) => {
-    if (!selectedSlot || !selectedMenu) return;
-    await slotApi.assign(selectedMenu.id, slotPage, selectedSlot.row, selectedSlot.col, itemId);
+    if (!selectedSlot || !selectedMenu || slotCategoryId === null) return;
+    await slotApi.assign(selectedMenu.id, slotCategoryId, slotPage, selectedSlot.row, selectedSlot.col, itemId);
     refreshSlots();
     setShowItemPicker(false);
     setSelectedSlot(null);
   };
 
-  const handleSlotDrop = async (e: React.DragEvent, row: number, col: number) => {
+  const handleSlotDrop = async (e: React.DragEvent, toRow: number, toCol: number) => {
     e.preventDefault();
-    if (dragItemId == null || !selectedMenu) return;
-    await slotApi.assign(selectedMenu.id, slotPage, row, col, dragItemId);
+    if (!selectedMenu || slotCategoryId === null) return;
+
+    if (dragSlot) {
+      // 프리뷰 내 셀 → 셀 이동/스왑
+      if (dragSlot.row === toRow && dragSlot.col === toCol) { setDragSlot(null); return; }
+      const fromSlotData = getSlot(dragSlot.row, dragSlot.col);
+      const toSlotData = getSlot(toRow, toCol);
+      if (!fromSlotData?.itemId) { setDragSlot(null); return; }
+
+      const fromItemId = fromSlotData.itemId;
+      const toItemId = toSlotData?.itemId ?? null;
+
+      await slotApi.assign(selectedMenu.id, slotCategoryId, slotPage, toRow, toCol, fromItemId);
+      if (toItemId) {
+        await slotApi.assign(selectedMenu.id, slotCategoryId, slotPage, dragSlot.row, dragSlot.col, toItemId);
+      } else {
+        await slotApi.clear(selectedMenu.id, slotCategoryId, slotPage, dragSlot.row, dragSlot.col);
+      }
+      setDragSlot(null);
+    } else if (dragItemId != null) {
+      // 왼쪽 패널 → 슬롯 드래그
+      await slotApi.assign(selectedMenu.id, slotCategoryId, slotPage, toRow, toCol, dragItemId);
+      setDragItemId(null);
+    }
     refreshSlots();
-    setDragItemId(null);
   };
+
+  // 전체 탭 자동배열: 카테고리 순서 → 아이템 sortOrder 순
+  const perPage = layout.columns * layout.rows;
+  const autoItems = useMemo(() => {
+    return [...previewItems].sort((a, b) => {
+      const catA = categories.findIndex(c => c.id === a.categoryId);
+      const catB = categories.findIndex(c => c.id === b.categoryId);
+      if (catA !== catB) return catA - catB;
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    });
+  }, [previewItems, categories]);
+  const autoTotalPages = Math.max(1, Math.ceil(autoItems.length / perPage));
+  const autoPageItems = useMemo(() => {
+    const page = autoItems.slice(slotPage * perPage, (slotPage + 1) * perPage);
+    while (page.length < perPage) page.push(null as unknown as Item);
+    return page;
+  }, [autoItems, slotPage, perPage]);
+
+  // 카테고리별 슬롯 총 페이지 (배치된 슬롯 기준 + 1)
+  const slotTotalPages = useMemo(() => {
+    if (slots.length === 0) return 1;
+    return Math.max(1, Math.max(...slots.map(s => s.page)) + 1);
+  }, [slots]);
 
   const filteredItems = filterCategoryId
     ? previewItems.filter(i => i.categoryId === filterCategoryId)
@@ -132,6 +181,11 @@ export function MenuEditorPage() {
 
   const categoryCount = (catId: number) =>
     previewItems.filter(i => i.categoryId === catId).length;
+
+  // 레이아웃 탭 왼쪽 패널 아이템
+  const layoutPanelItems = slotCategoryId !== null
+    ? previewItems.filter(i => i.categoryId === slotCategoryId)
+    : previewItems;
 
   const handleSave = async () => {
     try {
@@ -215,6 +269,7 @@ export function MenuEditorPage() {
     await categoryApi2.delete(selectedStore.id, selectedMenu.id, catId);
     setCategories(prev => prev.filter(c => c.id !== catId));
     if (filterCategoryId === catId) setFilterCategoryId(null);
+    if (slotCategoryId === catId) setSlotCategoryId(null);
   };
 
   const statusLabel = (s?: string) =>
@@ -229,9 +284,7 @@ export function MenuEditorPage() {
 
       {/* ── 상단 헤더 ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e0e0e0', flexShrink: 0 }}>
-        {/* 메인 헤더 행 */}
         <div style={{ height: 50, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8 }}>
-          {/* 점포 선택 */}
           <select style={hSelectStyle} value={selectedTenant?.id ?? ''}
             onChange={e => setSelectedTenant(tenants.find(t => t.id === Number(e.target.value)) ?? null)}>
             <option value="">고객사 선택</option>
@@ -269,7 +322,6 @@ export function MenuEditorPage() {
 
           <div style={{ flex: 1 }} />
 
-          {/* 탭 전환 */}
           <div style={{ display: 'flex', border: '1px solid #e0e0e0', borderRadius: 6, overflow: 'hidden' }}>
             {([['products', '상품 관리'], ['layout', '메뉴 배치']] as [MainTab, string][]).map(([tab, label]) => (
               <button key={tab} onClick={() => setMainTab(tab)} style={{
@@ -283,7 +335,6 @@ export function MenuEditorPage() {
           </div>
         </div>
 
-        {/* 메뉴판 관리 서브 행 */}
         {showMenuMgr && selectedStore && (
           <div style={{ borderTop: '1px solid #f0f0f0', padding: '8px 16px', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', background: '#fafafa' }}>
             {menus.map(m => (
@@ -349,7 +400,6 @@ export function MenuEditorPage() {
               )}
             </div>
 
-            {/* 카테고리 관리 패널 */}
             {showCatMgr && selectedMenu && (
               <div style={{ width: 210, background: '#f8fbff', borderRight: '1px solid #dde8f5', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
                 <div style={{ padding: '10px 12px', borderBottom: '1px solid #dde8f5', fontWeight: 700, fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -362,8 +412,7 @@ export function MenuEditorPage() {
                       {editingCat?.id === c.id ? (
                         <>
                           <input style={{ ...inputStyle, flex: 1, fontSize: 12 }} value={editingCat.name}
-                            onChange={e => setEditingCat({ ...editingCat, name: e.target.value })
-                            } />
+                            onChange={e => setEditingCat({ ...editingCat, name: e.target.value })} />
                           <button onClick={handleUpdateCategory} style={smBtnStyle}>저장</button>
                           <button onClick={() => setEditingCat(null)} style={delBtnStyle}>취소</button>
                         </>
@@ -418,7 +467,6 @@ export function MenuEditorPage() {
                         borderRadius: 8, cursor: 'pointer',
                         transition: 'border-color 0.15s',
                       }}>
-                      {/* 썸네일 */}
                       <div style={{
                         width: 42, height: 42, borderRadius: 6, flexShrink: 0,
                         background: item.imageUrls?.[0] ? `url(${item.imageUrls[0]}) center/cover` : '#ffe8d6',
@@ -501,43 +549,51 @@ export function MenuEditorPage() {
         {/* ━━━ 메뉴 배치 탭 ━━━ */}
         {mainTab === 'layout' && (
           <>
-            {/* 상품 목록 (드래그 소스) */}
+            {/* 왼쪽: 상품 목록 (드래그 소스) */}
             <div style={{ width: 200, background: '#fff', borderRight: '1px solid #e0e0e0', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
               <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', fontSize: 11, fontWeight: 700, color: '#aaa', letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                상품 목록
+                {slotCategoryId !== null
+                  ? (categories.find(c => c.id === slotCategoryId)?.name ?? '상품')
+                  : '전체 상품'}
               </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-                {previewItems.length === 0
-                  ? <Empty>상품이 없습니다</Empty>
-                  : previewItems.map(item => (
-                    <div key={item.id} draggable
-                      onDragStart={() => setDragItemId(item.id!)}
-                      onDragEnd={() => setDragItemId(null)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '7px 9px', marginBottom: 5, borderRadius: 7,
-                        border: `1px solid ${dragItemId === item.id ? '#ff6b35' : '#e8e8e8'}`,
-                        background: dragItemId === item.id ? '#fff8f5' : '#fff',
-                        cursor: 'grab', fontSize: 13,
-                      }}>
-                      <div style={{
-                        width: 32, height: 32, borderRadius: 5, flexShrink: 0,
-                        background: item.imageUrls?.[0] ? `url(${item.imageUrls[0]}) center/cover` : '#ffe8d6',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
-                      }}>
-                        {!item.imageUrls?.[0] && '🍽️'}
+              {slotCategoryId === null ? (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, textAlign: 'center' }}>
+                  <span style={{ fontSize: 12, color: '#bbb', lineHeight: 1.6 }}>카테고리 탭을 선택하면<br />해당 카테고리 상품을<br />드래그로 배치할 수 있습니다</span>
+                </div>
+              ) : (
+                <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+                  {layoutPanelItems.length === 0
+                    ? <Empty>상품이 없습니다</Empty>
+                    : layoutPanelItems.map(item => (
+                      <div key={item.id} draggable
+                        onDragStart={() => { setDragItemId(item.id!); setDragSlot(null); }}
+                        onDragEnd={() => setDragItemId(null)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '7px 9px', marginBottom: 5, borderRadius: 7,
+                          border: `1px solid ${dragItemId === item.id ? '#ff6b35' : '#e8e8e8'}`,
+                          background: dragItemId === item.id ? '#fff8f5' : '#fff',
+                          cursor: 'grab', fontSize: 13,
+                        }}>
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 5, flexShrink: 0,
+                          background: item.imageUrls?.[0] ? `url(${item.imageUrls[0]}) center/cover` : '#ffe8d6',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                        }}>
+                          {!item.imageUrls?.[0] && '🍽️'}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                          <div style={{ fontSize: 11, color: '#ff6b35' }}>{Number(item.price).toLocaleString()}원</div>
+                        </div>
                       </div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
-                        <div style={{ fontSize: 11, color: '#ff6b35' }}>{Number(item.price).toLocaleString()}원</div>
-                      </div>
-                    </div>
-                  ))
-                }
-              </div>
+                    ))
+                  }
+                </div>
+              )}
             </div>
 
-            {/* 키오스크 프리뷰 + 슬롯 배치 */}
+            {/* 가운데: 키오스크 프리뷰 */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, overflow: 'auto', background: '#f5f7fa' }}>
               {!selectedMenu
                 ? <Empty>메뉴판을 선택하세요</Empty>
@@ -554,6 +610,9 @@ export function MenuEditorPage() {
                     const cellH = Math.floor((gridH - (layout.rows - 1) * 6) / layout.rows);
                     const cellSize = Math.min(cellW, cellH);
                     const imgSize = Math.max(30, cellSize - 36);
+
+                    const isAutoMode = slotCategoryId === null;
+                    const totalPages = isAutoMode ? autoTotalPages : slotTotalPages;
 
                     return (
                       <div style={{
@@ -587,33 +646,57 @@ export function MenuEditorPage() {
                           })}
                         </div>
 
-                        {/* 슬롯 그리드 */}
+                        {/* 그리드 */}
                         <div style={{ flex: 1, padding: 8, display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden' }}>
                           {Array.from({ length: layout.rows }).map((_, rowIdx) => (
                             <div key={rowIdx} style={{ display: 'flex', gap: 6 }}>
                               {Array.from({ length: layout.columns }).map((_, colIdx) => {
+                                const linearIdx = rowIdx * layout.columns + colIdx;
+
+                                if (isAutoMode) {
+                                  // 전체: 자동배열 (read-only)
+                                  const autoItem = autoPageItems[linearIdx] as Item | null;
+                                  return autoItem ? (
+                                    <AutoItemCell key={colIdx} item={autoItem} size={cellSize} imgSize={imgSize} />
+                                  ) : (
+                                    <EmptyCell key={colIdx} size={cellSize} />
+                                  );
+                                }
+
+                                // 카테고리별: 슬롯 기반 편집
                                 const slot = getSlot(rowIdx, colIdx);
-                                const state = getCellState(rowIdx, colIdx);
+                                const hasItem = !!slot?.itemId;
+                                const isDragOver = false;
+
                                 return (
                                   <div key={colIdx}
-                                    onClick={() => state === 'empty-add' ? handleSlotClick(rowIdx, colIdx) : undefined}
-                                    onContextMenu={e => state === 'item' ? handleSlotRightClick(e, rowIdx, colIdx) : e.preventDefault()}
-                                    onDragOver={e => state === 'empty-add' ? e.preventDefault() : undefined}
-                                    onDrop={e => state === 'empty-add' ? handleSlotDrop(e, rowIdx, colIdx) : undefined}
-                                    title={state === 'item' ? '우클릭으로 제거' : state === 'empty-add' ? '클릭하여 상품 배치' : undefined}
+                                    draggable={hasItem}
+                                    onDragStart={(e) => {
+                                      if (!hasItem) return;
+                                      setDragSlot({ row: rowIdx, col: colIdx });
+                                      setDragItemId(null);
+                                      e.dataTransfer.effectAllowed = 'move';
+                                    }}
+                                    onDragEnd={() => setDragSlot(null)}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => handleSlotDrop(e, rowIdx, colIdx)}
+                                    onClick={() => !hasItem ? handleSlotClick(rowIdx, colIdx) : undefined}
+                                    onContextMenu={(e) => hasItem ? handleSlotRightClick(e, rowIdx, colIdx) : e.preventDefault()}
+                                    title={hasItem ? '드래그: 이동 | 우클릭: 제거' : '클릭: 배치 | 드래그해서 놓기'}
                                     style={{
                                       width: cellSize, height: cellSize, flexShrink: 0,
-                                      border: state === 'item' ? '1px solid #e0e0e0'
-                                        : state === 'empty-add' ? '1.5px dashed #bbb'
-                                        : '1px solid #f0f0f0',
+                                      border: hasItem
+                                        ? (dragSlot?.row === rowIdx && dragSlot?.col === colIdx ? '2px solid #ff6b35' : '1px solid #e0e0e0')
+                                        : '1.5px dashed #bbb',
                                       borderRadius: 8,
-                                      background: state === 'item' ? '#fff' : '#fafafa',
-                                      opacity: state === 'other-category' ? 0.2 : 1,
-                                      cursor: state === 'item' ? 'context-menu' : state === 'empty-add' ? 'pointer' : 'default',
+                                      background: hasItem ? '#fff' : '#fafafa',
+                                      cursor: hasItem ? 'grab' : 'pointer',
                                       display: 'flex', flexDirection: 'column',
                                       overflow: 'hidden', position: 'relative',
+                                      opacity: (dragSlot?.row === rowIdx && dragSlot?.col === colIdx) ? 0.4 : 1,
+                                      transition: 'opacity 0.15s',
                                     }}>
-                                    {state === 'item' && slot && (
+                                    {hasItem && slot ? (
                                       <>
                                         <div style={{
                                           height: imgSize, flexShrink: 0,
@@ -631,11 +714,7 @@ export function MenuEditorPage() {
                                           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 11 }}>품절</div>
                                         )}
                                       </>
-                                    )}
-                                    {state === 'other-category' && (
-                                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🍽️</div>
-                                    )}
-                                    {state === 'empty-add' && (
+                                    ) : (
                                       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc', fontSize: 20 }}>+</div>
                                     )}
                                   </div>
@@ -648,12 +727,18 @@ export function MenuEditorPage() {
                         {/* 하단 네비게이션 */}
                         <div style={{ height: footerH, background: '#fff', borderTop: '1px solid #eee', padding: '0 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <button onClick={() => setSlotPage(p => Math.max(0, p - 1))} disabled={slotPage === 0} style={navBtnStyle}>◀</button>
-                            <span style={{ fontSize: 12, color: '#888' }}>{slotPage + 1} 페이지</span>
-                            <button onClick={() => setSlotPage(p => p + 1)} style={navBtnStyle}>▶</button>
+                            <button
+                              onClick={() => setSlotPage(p => Math.max(0, p - 1))}
+                              disabled={slotPage === 0}
+                              style={navBtnStyle}>◀</button>
+                            <span style={{ fontSize: 12, color: '#888' }}>{slotPage + 1} / {totalPages}</span>
+                            <button
+                              onClick={() => setSlotPage(p => Math.min(totalPages - 1, p + 1))}
+                              disabled={isAutoMode ? slotPage >= autoTotalPages - 1 : false}
+                              style={navBtnStyle}>▶</button>
                           </div>
                           <span style={{ fontSize: 10, color: '#bbb' }}>
-                            {slotCategoryId !== null ? '클릭: 배치 | 우클릭: 제거 | 드래그: 놓기' : '카테고리 탭 선택 시 배치 가능'}
+                            {isAutoMode ? '자동배열 (카테고리 탭 선택 시 편집 가능)' : '드래그: 이동/스왑 | 클릭: 배치 | 우클릭: 제거'}
                           </span>
                         </div>
                       </div>
@@ -662,7 +747,7 @@ export function MenuEditorPage() {
               }
             </div>
 
-            {/* 레이아웃 설정 */}
+            {/* 오른쪽: 레이아웃 설정 */}
             {selectedStore && (
               <div style={{ width: 260, borderLeft: '1px solid #e0e0e0', background: '#fff', padding: 16, overflowY: 'auto', flexShrink: 0 }}>
                 <LayoutSettingPanel storeId={selectedStore.id} />
@@ -684,7 +769,7 @@ export function MenuEditorPage() {
                 </div>
               )}
               <div style={{ flex: 1, overflowY: 'auto' }}>
-                {(slotCategoryId !== null ? previewItems.filter(i => i.categoryId === slotCategoryId) : previewItems).map(item => (
+                {layoutPanelItems.map(item => (
                   <div key={item.id} onClick={() => handleAssignItem(item.id!)}
                     style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                     onMouseEnter={e => (e.currentTarget.style.background = '#fff8f5')}
@@ -710,6 +795,45 @@ export function MenuEditorPage() {
 }
 
 // ── 서브 컴포넌트 ──
+
+function AutoItemCell({ item, size, imgSize }: { item: Item; size: number; imgSize: number }) {
+  const isSoldOut = item.status === 'SOLD_OUT';
+  return (
+    <div style={{
+      width: size, height: size, flexShrink: 0,
+      border: '1px solid #e0e0e0', borderRadius: 8,
+      background: isSoldOut ? '#f5f5f5' : '#fff',
+      display: 'flex', flexDirection: 'column',
+      overflow: 'hidden', position: 'relative',
+      opacity: isSoldOut ? 0.6 : 1,
+    }}>
+      <div style={{
+        height: imgSize, flexShrink: 0,
+        background: item.imageUrls?.[0] ? `url(${item.imageUrls[0]}) center/cover` : '#ffe8d6',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: Math.max(14, imgSize / 2.5),
+      }}>
+        {!item.imageUrls?.[0] && '🍽️'}
+      </div>
+      <div style={{ flex: 1, padding: '3px 5px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ fontSize: Math.max(8, size / 12), fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+        <div style={{ fontSize: Math.max(8, size / 13), color: '#ff6b35', fontWeight: 700 }}>{Number(item.price).toLocaleString()}원</div>
+      </div>
+      {isSoldOut && (
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 11 }}>품절</div>
+      )}
+    </div>
+  );
+}
+
+function EmptyCell({ size }: { size: number }) {
+  return (
+    <div style={{
+      width: size, height: size, flexShrink: 0,
+      border: '1px solid #f0f0f0', borderRadius: 8, background: '#fafafa',
+    }} />
+  );
+}
 
 function CatBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (

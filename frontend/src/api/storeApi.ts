@@ -16,6 +16,7 @@ export interface SlotDto {
   page: number;
   row: number;
   col: number;
+  categoryId: number;
   itemId: number | null;
   itemName: string | null;
   itemPrice: number | null;
@@ -73,10 +74,10 @@ export const layoutApi = {
 };
 
 export const slotApi = {
-  list: (menuId: number) =>
-    client.get<{ data: SlotDto[] }>(`/api/v1/admin/menus/${menuId}/slots`).then(r => r.data.data),
-  assign: (menuId: number, page: number, row: number, col: number, itemId: number | null) =>
-    client.put<{ data: SlotDto }>(`/api/v1/admin/menus/${menuId}/slots/${page}/${row}/${col}`, { itemId }).then(r => r.data.data),
-  clear: (menuId: number, page: number, row: number, col: number) =>
-    client.delete(`/api/v1/admin/menus/${menuId}/slots/${page}/${row}/${col}`),
+  list: (menuId: number, categoryId: number) =>
+    client.get<{ data: SlotDto[] }>(`/api/v1/admin/menus/${menuId}/slots`, { params: { categoryId } }).then(r => r.data.data),
+  assign: (menuId: number, categoryId: number, page: number, row: number, col: number, itemId: number) =>
+    client.put<{ data: SlotDto }>(`/api/v1/admin/menus/${menuId}/slots/${categoryId}/${page}/${row}/${col}`, { itemId }).then(r => r.data.data),
+  clear: (menuId: number, categoryId: number, page: number, row: number, col: number) =>
+    client.delete(`/api/v1/admin/menus/${menuId}/slots/${categoryId}/${page}/${row}/${col}`),
 };

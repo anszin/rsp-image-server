@@ -9,10 +9,11 @@ import java.util.Optional;
 
 public interface ItemSlotRepository extends JpaRepository<ItemSlot, Long> {
 
-    @Query("SELECT s FROM ItemSlot s LEFT JOIN FETCH s.item WHERE s.menu.id = :menuId ORDER BY s.page, s.row, s.col")
-    List<ItemSlot> findByMenuIdWithItem(@Param("menuId") Long menuId);
+    @Query("SELECT s FROM ItemSlot s LEFT JOIN FETCH s.item WHERE s.menu.id = :menuId AND s.category.id = :categoryId ORDER BY s.page, s.row, s.col")
+    List<ItemSlot> findByMenuIdAndCategoryIdWithItem(@Param("menuId") Long menuId, @Param("categoryId") Long categoryId);
 
-    Optional<ItemSlot> findByMenuIdAndPageAndRowAndCol(Long menuId, int page, int row, int col);
+    Optional<ItemSlot> findByMenuIdAndCategoryIdAndPageAndRowAndCol(
+            Long menuId, Long categoryId, int page, int row, int col);
 
     void deleteByMenuId(Long menuId);
 }
