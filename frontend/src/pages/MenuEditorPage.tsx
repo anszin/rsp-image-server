@@ -71,10 +71,8 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
     itemApi.listByMenu(selectedMenu.id).then(setPreviewItems).catch(() => {});
   }, [selectedStore, selectedMenu]);
 
-  const refreshItems = (categoryId?: number) => {
-    if (categoryId) {
-      itemApi.listByCategory(categoryId).then(setPreviewItems).catch(() => {});
-    } else if (selectedMenu) {
+  const refreshItems = () => {
+    if (selectedMenu) {
       itemApi.listByMenu(selectedMenu.id).then(setPreviewItems).catch(() => {});
     }
   };
@@ -88,11 +86,10 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
     if (!draft.id) return;
     if (!window.confirm(`'${draft.name}' 상품을 삭제할까요?`)) return;
     try {
-      const categoryId = draft.categoryId;
       await itemApi.delete(draft.id);
       alert('삭제되었습니다.');
       reset();
-      refreshItems(categoryId);
+      refreshItems();
     } catch (e: any) {
       alert('오류: ' + (e.response?.data?.message ?? e.message));
     }
@@ -104,12 +101,12 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
         const updated = await itemApi.update(draft.id, draft);
         loadItem(updated);
         alert('저장되었습니다.');
-        refreshItems(updated.categoryId);
+        refreshItems();
       } else {
         const created = await itemApi.create(draft);
         alert('등록되었습니다.');
         reset();
-        refreshItems(created.categoryId);
+        refreshItems();
       }
     } catch (e: any) {
       alert('오류: ' + (e.response?.data?.message ?? e.message));
@@ -277,7 +274,6 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
                     const id = Number(e.target.value);
                     setField('categoryId', id);
                     setField('categoryName', categories.find(c => c.id === id)?.name);
-                    if (id) refreshItems(id);
                   }}>
                   <option value="">카테고리 선택</option>
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
