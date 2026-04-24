@@ -15,7 +15,7 @@ interface Props {
 }
 
 export function MenuEditorPage({ onOpenSlotEditor }: Props) {
-  const { draft, setField, previewMode, setPreviewMode, reset } = useEditorStore();
+  const { draft, setField, previewMode, setPreviewMode, reset, loadItem } = useEditorStore();
   const { setLayout } = useLayoutStore();
 
   // 선택 상태
@@ -76,6 +76,25 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
       itemApi.listByCategory(categoryId).then(setPreviewItems).catch(() => {});
     } else if (selectedMenu) {
       itemApi.listByMenu(selectedMenu.id).then(setPreviewItems).catch(() => {});
+    }
+  };
+
+  const handleItemClick = (clickedItem: Partial<Item>) => {
+    if (!clickedItem.id) return;
+    loadItem(clickedItem as Item);
+  };
+
+  const handleDelete = async () => {
+    if (!draft.id) return;
+    if (!window.confirm(`'${draft.name}' 상품을 삭제할까요?`)) return;
+    try {
+      const categoryId = draft.categoryId;
+      await itemApi.delete(draft.id);
+      alert('삭제되었습니다.');
+      reset();
+      refreshItems(categoryId);
+    } catch (e: any) {
+      alert('오류: ' + (e.response?.data?.message ?? e.message));
     }
   };
 
@@ -159,7 +178,10 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
         <div style={{ padding: '14px 16px', borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{draft.id ? '상품 수정' : '상품 등록'}</h2>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={reset} style={cancelBtnStyle}>취소</button>
+            {draft.id && (
+              <button onClick={handleDelete} style={deleteBtnStyle}>삭제</button>
+            )}
+            <button onClick={reset} style={cancelBtnStyle}>{draft.id ? '새 상품' : '취소'}</button>
             <button onClick={handleSave} style={saveBtnStyle}>저장</button>
           </div>
         </div>
@@ -363,7 +385,7 @@ export function MenuEditorPage({ onOpenSlotEditor }: Props) {
             ※ 단말기에 실제로 표시되는 화면입니다
           </div>
 
-          {previewMode === 'KIOSK' && <KioskPreview item={draft} allItems={previewItems} categories={categories} activeCategoryId={draft.categoryId ?? null} />}
+          {previewMode === 'KIOSK' && <KioskPreview item={draft} allItems={previewItems} categories={categories} activeCategoryId={draft.categoryId ?? null} onItemClick={handleItemClick} />}
           {previewMode === 'POS' && <PosPreview item={draft} />}
           {previewMode === 'QR' && (
             <div style={{ color: '#aaa', padding: 40, textAlign: 'center' }}>

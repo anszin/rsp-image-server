@@ -8,13 +8,14 @@ interface Props {
   allItems?: Item[];
   categories?: CategoryDto[];
   activeCategoryId?: number | null;
+  onItemClick?: (item: Partial<Item>) => void;
 }
 
-function KioskItemCard({ item, highlight, size }: { item: Partial<Item>; highlight?: boolean; size: number }) {
+function KioskItemCard({ item, highlight, size, onClick }: { item: Partial<Item>; highlight?: boolean; size: number; onClick?: () => void }) {
   const isSoldOut = item.status === 'SOLD_OUT';
   const imgSize = Math.max(40, size - 50);
   return (
-    <div style={{
+    <div onClick={onClick} style={{
       border: highlight ? '2px solid #ff6b35' : '1px solid #e0e0e0',
       borderRadius: 8,
       overflow: 'hidden',
@@ -54,7 +55,7 @@ function KioskItemCard({ item, highlight, size }: { item: Partial<Item>; highlig
   );
 }
 
-export function KioskPreview({ item, allItems = [], categories = [], activeCategoryId }: Props) {
+export function KioskPreview({ item, allItems = [], categories = [], activeCategoryId, onItemClick }: Props) {
   const { layout } = useLayoutStore();
   const [page, setPage] = useState(0);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
@@ -148,7 +149,7 @@ export function KioskPreview({ item, allItems = [], categories = [], activeCateg
               const it = pageItems[idx];
               const isHighlight = it?.productCode === item.productCode || (!it?.productCode && idx === 0 && allItems.length === 0);
               return it?.productCode || it?.name ? (
-                <KioskItemCard key={colIdx} item={it} highlight={isHighlight} size={cellSize} />
+                <KioskItemCard key={colIdx} item={it} highlight={isHighlight} size={cellSize} onClick={() => it.id && onItemClick?.(it)} />
               ) : (
                 <div key={colIdx} style={{
                   width: cellSize, height: cellSize, flexShrink: 0,

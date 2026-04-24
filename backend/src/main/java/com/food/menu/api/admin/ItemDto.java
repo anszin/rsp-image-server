@@ -27,6 +27,7 @@ public class ItemDto {
         @NotNull @Min(0) private BigDecimal price;
         private ItemStatus status;
         private int sortOrder;
+        private Long categoryId;
         private List<OptionGroupRequest> optionGroups;
     }
 

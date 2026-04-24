@@ -72,6 +72,12 @@ public class ItemService {
                 .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다: " + itemId));
         item.update(req.getName(), req.getPrice(), req.getStatus(), req.getSortOrder());
 
+        if (req.getCategoryId() != null) {
+            Category category = categoryRepository.findById(req.getCategoryId())
+                    .orElseThrow(() -> new IllegalArgumentException("카테고리를 찾을 수 없습니다: " + req.getCategoryId()));
+            item.changeCategory(category);
+        }
+
         item.getOptionGroups().clear();
         if (req.getOptionGroups() != null) {
             saveOptionGroups(item, req.getOptionGroups());
