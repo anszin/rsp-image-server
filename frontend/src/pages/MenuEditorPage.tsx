@@ -526,84 +526,118 @@ export function MenuEditorPage() {
               </div>
             </div>
 
-            {/* 슬롯 그리드 */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24, overflow: 'auto', background: '#f5f7fa' }}>
+            {/* 키오스크 프리뷰 + 슬롯 배치 */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, overflow: 'auto', background: '#f5f7fa' }}>
               {!selectedMenu
                 ? <Empty>메뉴판을 선택하세요</Empty>
-                : (
-                  <>
-                    <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>
-                      클릭: 상품 배치 &nbsp;|&nbsp; 우클릭: 제거 &nbsp;|&nbsp; 드래그: 목록에서 끌어다 놓기
-                    </div>
+                : (() => {
+                    const isLandscape = layout.orientation === 'LANDSCAPE';
+                    const frameW = isLandscape ? 560 : 340;
+                    const frameH = isLandscape ? 420 : 660;
+                    const headerH = 36;
+                    const tabH = 34;
+                    const footerH = 40;
+                    const gridH = frameH - headerH - tabH - footerH;
+                    const gridW = frameW - 16;
+                    const cellW = Math.floor((gridW - (layout.columns - 1) * 6) / layout.columns);
+                    const cellH = Math.floor((gridH - (layout.rows - 1) * 6) / layout.rows);
+                    const cellSize = Math.min(cellW, cellH);
+                    const imgSize = Math.max(30, cellSize - 36);
 
-                    {/* 슬롯 프레임 */}
-                    <div style={{
-                      border: '6px solid #333', borderRadius: 14, overflow: 'hidden',
-                      background: '#f9f9f9',
-                      width: layout.orientation === 'LANDSCAPE' ? 640 : 380,
-                      transition: 'width 0.3s',
-                    }}>
-                      {/* 헤더 */}
-                      <div style={{ background: '#ff6b35', color: '#fff', padding: '8px 14px', fontWeight: 700, fontSize: 14 }}>
-                        {selectedMenu.name}
-                        <span style={{ float: 'right', fontSize: 11, opacity: 0.8 }}>{layout.columns}×{layout.rows}</span>
-                      </div>
+                    return (
+                      <div style={{
+                        width: frameW, height: frameH,
+                        border: '8px solid #1e2a3a', borderRadius: 18,
+                        overflow: 'hidden', background: '#f9f9f9',
+                        display: 'flex', flexDirection: 'column',
+                        fontFamily: 'Pretendard',
+                        transition: 'width 0.3s, height 0.3s',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                      }}>
+                        {/* 기기 헤더 */}
+                        <div style={{ height: headerH, background: '#ff6b35', color: '#fff', padding: '0 12px', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                          <span>메뉴 주문</span>
+                          <span style={{ fontSize: 11, opacity: 0.8 }}>{layout.columns}×{layout.rows} | {isLandscape ? '가로형' : '세로형'}</span>
+                        </div>
 
-                      {/* 그리드 */}
-                      <div style={{ padding: 10 }}>
-                        {Array.from({ length: layout.rows }).map((_, rowIdx) => (
-                          <div key={rowIdx} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                            {Array.from({ length: layout.columns }).map((_, colIdx) => {
-                              const slot = getSlot(rowIdx, colIdx);
-                              const hasItem = !!slot?.itemId;
-                              return (
-                                <div key={colIdx}
-                                  onClick={() => handleSlotClick(rowIdx, colIdx)}
-                                  onContextMenu={e => handleSlotRightClick(e, rowIdx, colIdx)}
-                                  onDragOver={e => e.preventDefault()}
-                                  onDrop={e => handleSlotDrop(e, rowIdx, colIdx)}
-                                  style={{
-                                    flex: 1, height: layout.orientation === 'LANDSCAPE' ? 110 : 130,
-                                    border: hasItem ? '2px solid #ff6b35' : '2px dashed #ddd',
-                                    borderRadius: 8, background: hasItem ? '#fff' : '#fafafa',
-                                    cursor: hasItem ? 'context-menu' : 'pointer',
-                                    display: 'flex', flexDirection: 'column',
-                                    alignItems: 'center', justifyContent: 'center',
-                                    overflow: 'hidden', position: 'relative',
-                                  }}>
-                                  {hasItem ? (
-                                    <>
-                                      {slot.imageUrl
-                                        ? <img src={slot.imageUrl} alt="" style={{ width: '100%', height: 60, objectFit: 'cover' }} />
-                                        : <div style={{ fontSize: 28, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🍽️</div>
-                                      }
-                                      <div style={{ padding: '4px 6px', width: '100%', textAlign: 'center' }}>
-                                        <div style={{ fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{slot.itemName}</div>
-                                        <div style={{ fontSize: 11, color: '#ff6b35' }}>{slot.itemPrice?.toLocaleString()}원</div>
-                                      </div>
-                                      {slot.itemStatus === 'SOLD_OUT' && (
-                                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12 }}>품절</div>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <span style={{ color: '#ccc', fontSize: 24 }}>+</span>
-                                  )}
-                                </div>
-                              );
-                            })}
+                        {/* 카테고리 탭 */}
+                        <div style={{ height: tabH, display: 'flex', background: '#fff', borderBottom: '1px solid #eee', padding: '0 8px', flexShrink: 0, overflowX: 'auto', alignItems: 'flex-end' }}>
+                          {[{ id: -1, name: '전체' }, ...categories].map((cat, i) => (
+                            <div key={cat.id} style={{
+                              padding: '6px 10px', fontSize: 11, whiteSpace: 'nowrap', cursor: 'default',
+                              fontWeight: i === 0 ? 700 : 400,
+                              color: i === 0 ? '#ff6b35' : '#888',
+                              borderBottom: i === 0 ? '2px solid #ff6b35' : 'none',
+                            }}>{cat.name}</div>
+                          ))}
+                        </div>
+
+                        {/* 슬롯 그리드 */}
+                        <div style={{ flex: 1, padding: 8, display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden' }}>
+                          {Array.from({ length: layout.rows }).map((_, rowIdx) => (
+                            <div key={rowIdx} style={{ display: 'flex', gap: 6 }}>
+                              {Array.from({ length: layout.columns }).map((_, colIdx) => {
+                                const slot = getSlot(rowIdx, colIdx);
+                                const hasItem = !!slot?.itemId;
+                                return (
+                                  <div key={colIdx}
+                                    onClick={() => handleSlotClick(rowIdx, colIdx)}
+                                    onContextMenu={e => handleSlotRightClick(e, rowIdx, colIdx)}
+                                    onDragOver={e => e.preventDefault()}
+                                    onDrop={e => handleSlotDrop(e, rowIdx, colIdx)}
+                                    title={hasItem ? '우클릭으로 제거' : '클릭하여 상품 배치'}
+                                    style={{
+                                      width: cellSize, height: cellSize, flexShrink: 0,
+                                      border: hasItem ? '1px solid #e0e0e0' : '1.5px dashed #ccc',
+                                      borderRadius: 8,
+                                      background: hasItem ? '#fff' : 'rgba(255,255,255,0.6)',
+                                      cursor: hasItem ? 'context-menu' : 'pointer',
+                                      display: 'flex', flexDirection: 'column',
+                                      overflow: 'hidden', position: 'relative',
+                                      transition: 'border-color 0.15s',
+                                    }}>
+                                    {hasItem ? (
+                                      <>
+                                        <div style={{
+                                          height: imgSize, flexShrink: 0,
+                                          background: slot.imageUrl
+                                            ? `url(${slot.imageUrl}) center/cover`
+                                            : '#ffe8d6',
+                                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                          fontSize: Math.max(14, imgSize / 2.5),
+                                        }}>
+                                          {!slot.imageUrl && '🍽️'}
+                                        </div>
+                                        <div style={{ flex: 1, padding: '3px 5px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                          <div style={{ fontSize: Math.max(8, cellSize / 12), fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{slot.itemName}</div>
+                                          <div style={{ fontSize: Math.max(8, cellSize / 13), color: '#ff6b35', fontWeight: 700 }}>{slot.itemPrice?.toLocaleString()}원</div>
+                                        </div>
+                                        {slot.itemStatus === 'SOLD_OUT' && (
+                                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 11 }}>품절</div>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d0d0d0', fontSize: 20 }}>+</div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* 하단 네비게이션 */}
+                        <div style={{ height: footerH, background: '#fff', borderTop: '1px solid #eee', padding: '0 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <button onClick={() => setSlotPage(p => Math.max(0, p - 1))} disabled={slotPage === 0} style={navBtnStyle}>◀</button>
+                            <span style={{ fontSize: 12, color: '#888' }}>{slotPage + 1} 페이지</span>
+                            <button onClick={() => setSlotPage(p => p + 1)} style={navBtnStyle}>▶</button>
                           </div>
-                        ))}
+                          <span style={{ fontSize: 10, color: '#bbb' }}>클릭: 배치 | 우클릭: 제거 | 드래그: 놓기</span>
+                        </div>
                       </div>
-
-                      {/* 페이지 네비게이션 */}
-                      <div style={{ background: '#fff', borderTop: '1px solid #eee', padding: '8px 14px', display: 'flex', justifyContent: 'center', gap: 12, alignItems: 'center' }}>
-                        <button onClick={() => setSlotPage(p => Math.max(0, p - 1))} disabled={slotPage === 0} style={navBtnStyle}>◀</button>
-                        <span style={{ fontSize: 13, color: '#666' }}>페이지 {slotPage + 1}</span>
-                        <button onClick={() => setSlotPage(p => p + 1)} style={navBtnStyle}>▶</button>
-                      </div>
-                    </div>
-                  </>
-                )
+                    );
+                  })()
               }
             </div>
 
