@@ -88,6 +88,15 @@ export function MenuEditorPage() {
   const getSlot = (row: number, col: number) =>
     slots.find(s => s.page === slotPage && s.row === row && s.col === col);
 
+  // 셀 표시 상태: 'item' | 'empty-add' | 'empty-fill' | 'other-category'
+  const getCellState = (row: number, col: number) => {
+    const slot = getSlot(row, col);
+    if (!slot?.itemId) return slotCategoryId !== null ? 'empty-add' : 'empty-fill';
+    if (slotCategoryId === null) return 'item';
+    const item = previewItems.find(i => i.id === slot.itemId);
+    return item?.categoryId === slotCategoryId ? 'item' : 'other-category';
+  };
+
   const handleSlotClick = (row: number, col: number) => {
     if (getSlot(row, col)?.itemId) return;
     setSelectedSlot({ row, col });
@@ -584,34 +593,31 @@ export function MenuEditorPage() {
                             <div key={rowIdx} style={{ display: 'flex', gap: 6 }}>
                               {Array.from({ length: layout.columns }).map((_, colIdx) => {
                                 const slot = getSlot(rowIdx, colIdx);
-                                const hasItem = !!slot?.itemId;
+                                const state = getCellState(rowIdx, colIdx);
                                 return (
                                   <div key={colIdx}
-                                    onClick={() => hasItem ? undefined : (slotCategoryId !== null && handleSlotClick(rowIdx, colIdx))}
-                                    onContextMenu={e => hasItem ? handleSlotRightClick(e, rowIdx, colIdx) : e.preventDefault()}
-                                    onDragOver={e => slotCategoryId !== null && e.preventDefault()}
-                                    onDrop={e => slotCategoryId !== null && handleSlotDrop(e, rowIdx, colIdx)}
-                                    title={hasItem ? '우클릭으로 제거' : slotCategoryId !== null ? '클릭하여 상품 배치' : undefined}
+                                    onClick={() => state === 'empty-add' ? handleSlotClick(rowIdx, colIdx) : undefined}
+                                    onContextMenu={e => state === 'item' ? handleSlotRightClick(e, rowIdx, colIdx) : e.preventDefault()}
+                                    onDragOver={e => state === 'empty-add' ? e.preventDefault() : undefined}
+                                    onDrop={e => state === 'empty-add' ? handleSlotDrop(e, rowIdx, colIdx) : undefined}
+                                    title={state === 'item' ? '우클릭으로 제거' : state === 'empty-add' ? '클릭하여 상품 배치' : undefined}
                                     style={{
                                       width: cellSize, height: cellSize, flexShrink: 0,
-                                      border: hasItem
-                                        ? '1px solid #e0e0e0'
-                                        : slotCategoryId !== null
-                                          ? '1.5px dashed #bbb'
-                                          : '1px solid #f0f0f0',
+                                      border: state === 'item' ? '1px solid #e0e0e0'
+                                        : state === 'empty-add' ? '1.5px dashed #bbb'
+                                        : '1px solid #f0f0f0',
                                       borderRadius: 8,
-                                      background: hasItem ? '#fff' : '#fafafa',
-                                      cursor: hasItem ? 'context-menu' : slotCategoryId !== null ? 'pointer' : 'default',
+                                      background: state === 'item' ? '#fff' : '#fafafa',
+                                      opacity: state === 'other-category' ? 0.2 : 1,
+                                      cursor: state === 'item' ? 'context-menu' : state === 'empty-add' ? 'pointer' : 'default',
                                       display: 'flex', flexDirection: 'column',
                                       overflow: 'hidden', position: 'relative',
                                     }}>
-                                    {hasItem ? (
+                                    {state === 'item' && slot && (
                                       <>
                                         <div style={{
                                           height: imgSize, flexShrink: 0,
-                                          background: slot.imageUrl
-                                            ? `url(${slot.imageUrl}) center/cover`
-                                            : '#ffe8d6',
+                                          background: slot.imageUrl ? `url(${slot.imageUrl}) center/cover` : '#ffe8d6',
                                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                                           fontSize: Math.max(14, imgSize / 2.5),
                                         }}>
@@ -625,9 +631,13 @@ export function MenuEditorPage() {
                                           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 11 }}>품절</div>
                                         )}
                                       </>
-                                    ) : slotCategoryId !== null ? (
+                                    )}
+                                    {state === 'other-category' && (
+                                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🍽️</div>
+                                    )}
+                                    {state === 'empty-add' && (
                                       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc', fontSize: 20 }}>+</div>
-                                    ) : null}
+                                    )}
                                   </div>
                                 );
                               })}
